@@ -11,3 +11,5 @@ build/
 *.xlsx
 *.xls
 *.csv
+.streamlit/secrets.toml
+results/

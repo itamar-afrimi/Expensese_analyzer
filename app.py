@@ -23,6 +23,48 @@ CONFIG_PATH = Path(__file__).parent / "config.yaml"
 OUTPUT_DIR = Path(__file__).parent / "output"
 
 
+def check_password() -> bool:
+    """Return True if the user is authenticated or no password is configured."""
+    try:
+        required_pw = st.secrets["app"]["password"]
+    except (KeyError, FileNotFoundError):
+        return True
+
+    if st.session_state.get("authenticated"):
+        return True
+
+    st.markdown("""
+    <style>
+        .login-box { max-width: 400px; margin: 120px auto; direction: rtl; text-align: center; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    with st.container():
+        st.title("🔒 מנתח הוצאות AI")
+        st.caption("הזן סיסמה כדי להיכנס")
+        pwd = st.text_input("סיסמה", type="password", key="login_pw")
+        if pwd:
+            if pwd == required_pw:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("סיסמה שגויה")
+    return False
+
+
+def get_api_key(config: dict) -> Optional[str]:
+    """Resolve OpenAI API key from env, st.secrets, or config.yaml."""
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        try:
+            key = st.secrets["openai"]["api_key"]
+        except (KeyError, FileNotFoundError):
+            pass
+    if not key:
+        key = config.get("openai", {}).get("api_key")
+    return key or None
+
+
 def load_config() -> dict:
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
@@ -73,9 +115,9 @@ def parse_uploaded_files(uploaded_files) -> dict[str, list[Transaction]]:
 def categorize_transactions(
     transactions: list[Transaction], config: dict, force: bool = False
 ) -> list[Transaction]:
-    api_key = os.environ.get("OPENAI_API_KEY") or config.get("openai", {}).get("api_key")
+    api_key = get_api_key(config)
     if not api_key:
-        st.error("לא נמצא מפתח OpenAI API. הגדר OPENAI_API_KEY כמשתנה סביבה.")
+        st.error("לא נמצא מפתח OpenAI API. הגדר ב-secrets או כמשתנה סביבה.")
         return transactions
 
     from agent.categorizer import Categorizer
@@ -90,7 +132,7 @@ def categorize_transactions(
 
 
 def generate_insights(report: ExpenseReport, config: dict) -> str:
-    api_key = os.environ.get("OPENAI_API_KEY") or config.get("openai", {}).get("api_key")
+    api_key = get_api_key(config)
     if not api_key:
         return "חסר מפתח API — לא ניתן לייצר תובנות"
     from agent.insights import InsightsGenerator
@@ -103,7 +145,7 @@ def generate_insights(report: ExpenseReport, config: dict) -> str:
 
 
 def scan_receipt(photo_bytes: bytes, filename: str, config: dict) -> Optional[dict]:
-    api_key = os.environ.get("OPENAI_API_KEY") or config.get("openai", {}).get("api_key")
+    api_key = get_api_key(config)
     if not api_key:
         st.error("חסר מפתח API")
         return None
@@ -258,6 +300,9 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded",
     )
+
+    if not check_password():
+        st.stop()
 
     st.markdown("""
     <style>
