@@ -75,6 +75,13 @@ def save_config(config: dict) -> None:
         yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 
+FREQUENCY_DIVISORS = {
+    "monthly": 1,
+    "bi-monthly": 2,
+    "quarterly": 3,
+    "yearly": 12,
+}
+
 def inject_fixed_expenses(
     grouped: dict[str, list[Transaction]], fixed_expenses: list[dict]
 ) -> None:
@@ -84,10 +91,13 @@ def inject_fixed_expenses(
         mm = re.search(r"(\d{2})/(\d{4})", label)
         tx_date = date(int(mm.group(2)), int(mm.group(1)), 1) if mm else (txs[0].date if txs else date.today())
         for entry in fixed_expenses:
+            freq = entry.get("frequency", "monthly")
+            divisor = FREQUENCY_DIVISORS.get(freq, 1)
+            monthly_amount = float(entry["amount"]) / divisor
             txs.append(Transaction(
                 date=tx_date,
                 description=entry["description"],
-                amount=float(entry["amount"]),
+                amount=round(monthly_amount, 2),
                 category=entry.get("category"),
                 source_bank="הוצאה קבועה",
                 billing_label=label,
@@ -374,18 +384,33 @@ def main():
 
         st.header("🏠 הוצאות קבועות")
         fixed_expenses = config.get("fixed_expenses", [])
+
+        if "fixed_list" not in st.session_state:
+            st.session_state["fixed_list"] = list(fixed_expenses)
+
+        freq_options = ["monthly", "bi-monthly", "quarterly", "yearly"]
+        freq_labels = {"monthly": "חודשי", "bi-monthly": "דו-חודשי (÷2)", "quarterly": "רבעוני (÷3)", "yearly": "שנתי (÷12)"}
+
         edited_fixed = []
-        for i, fe in enumerate(fixed_expenses):
-            cols = st.columns([3, 2, 2])
-            desc = cols[0].text_input("תיאור", value=fe["description"], key=f"fe_desc_{i}", label_visibility="collapsed")
-            amt = cols[1].number_input("סכום", value=int(fe["amount"]), step=100, key=f"fe_amt_{i}", label_visibility="collapsed")
-            cat = cols[2].selectbox("קטגוריה", config.get("categories", []),
-                                   index=config.get("categories", []).index(fe["category"]) if fe.get("category") in config.get("categories", []) else 0,
-                                   key=f"fe_cat_{i}", label_visibility="collapsed")
-            edited_fixed.append({"description": desc, "amount": amt, "category": cat})
+        for i, fe in enumerate(st.session_state["fixed_list"]):
+            st.caption(f"הוצאה {i + 1}")
+            cols = st.columns([3, 2])
+            desc = cols[0].text_input("תיאור", value=fe.get("description", ""), key=f"fe_desc_{i}", label_visibility="collapsed")
+            amt = cols[1].number_input("סכום מלא", value=int(fe.get("amount", 0)), step=100, key=f"fe_amt_{i}", label_visibility="collapsed")
+            cols2 = st.columns([2, 2, 1])
+            cat_list = config.get("categories", [])
+            cat_idx = cat_list.index(fe["category"]) if fe.get("category") in cat_list else 0
+            cat = cols2[0].selectbox("קטגוריה", cat_list, index=cat_idx, key=f"fe_cat_{i}", label_visibility="collapsed")
+            freq_idx = freq_options.index(fe.get("frequency", "monthly")) if fe.get("frequency", "monthly") in freq_options else 0
+            freq = cols2[1].selectbox("תדירות", freq_options, index=freq_idx, format_func=lambda x: freq_labels[x], key=f"fe_freq_{i}", label_visibility="collapsed")
+            if cols2[2].button("🗑️", key=f"fe_del_{i}"):
+                st.session_state["fixed_list"].pop(i)
+                st.rerun()
+            edited_fixed.append({"description": desc, "amount": amt, "category": cat, "frequency": freq})
 
         if st.button("➕ הוסף הוצאה קבועה", key="add_fixed"):
-            edited_fixed.append({"description": "חדש", "amount": 0, "category": config.get("categories", ["אחר"])[0]})
+            st.session_state["fixed_list"].append({"description": "", "amount": 0, "category": config.get("categories", ["אחר"])[0], "frequency": "monthly"})
+            st.rerun()
 
         st.divider()
 
@@ -404,6 +429,7 @@ def main():
             config["fixed_expenses"] = edited_fixed
             config["budgets"] = edited_budgets
             save_config(config)
+            st.session_state["fixed_list"] = list(edited_fixed)
             st.success("ההגדרות נשמרו!")
             st.rerun()
 

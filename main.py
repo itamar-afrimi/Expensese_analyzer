@@ -97,12 +97,16 @@ def _inject_fixed_expenses(
         else:
             tx_date = date.today()
 
+        freq_divisors = {"monthly": 1, "bi-monthly": 2, "quarterly": 3, "yearly": 12}
         for entry in fixed_expenses:
+            freq = entry.get("frequency", "monthly")
+            divisor = freq_divisors.get(freq, 1)
+            monthly_amount = round(float(entry["amount"]) / divisor, 2)
             txs.append(
                 Transaction(
                     date=tx_date,
                     description=entry["description"],
-                    amount=float(entry["amount"]),
+                    amount=monthly_amount,
                     category=entry.get("category"),
                     source_bank="הוצאה קבועה",
                     billing_label=label,

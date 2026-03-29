@@ -10,6 +10,7 @@ fixed_expenses:
 - description: שכר דירה
   amount: 7300
   category: דיור ושכירות
+  frequency: monthly
 categories:
 - מזון וסופרמרקט
 - מסעדות ובתי קפה
