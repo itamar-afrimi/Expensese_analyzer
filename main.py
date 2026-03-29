@@ -55,7 +55,7 @@ def collect_files(args) -> list[Path]:
     if hasattr(args, "dir") and args.dir:
         d = Path(args.dir)
         if d.is_dir():
-            for ext in ("*.csv", "*.xls", "*.xlsx", "*.xlsm"):
+            for ext in ("*.csv", "*.xls", "*.xlsx", "*.xlsm", "*.pdf"):
                 files.extend(d.glob(ext))
             files = sorted(set(files))
         else:

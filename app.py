@@ -353,8 +353,8 @@ def main():
 
         st.header("📁 העלאת קבצים")
         uploaded_files = st.file_uploader(
-            "גרור קבצי Excel/CSV של חיובי אשראי",
-            type=["csv", "xls", "xlsx", "xlsm"],
+            "גרור קבצי Excel/CSV/PDF של חיובי אשראי",
+            type=["csv", "xls", "xlsx", "xlsm", "pdf"],
             accept_multiple_files=True,
             key="expense_files",
         )

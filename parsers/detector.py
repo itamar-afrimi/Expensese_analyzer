@@ -9,6 +9,7 @@ from .hapoalim import HapoalimParser
 from .discount import DiscountParser
 from .mizrahi import MizrahiParser
 from .credit_card import CreditCardParser
+from .credit_card_pdf import parse_pdf as parse_credit_card_pdf, _is_available as pdf_available
 
 ALL_PARSERS: list[type[BankParser]] = [
     CreditCardParser,
@@ -18,11 +19,11 @@ ALL_PARSERS: list[type[BankParser]] = [
     MizrahiParser,
 ]
 
-SUPPORTED_EXTENSIONS = {".csv"} | EXCEL_EXTENSIONS
+SUPPORTED_EXTENSIONS = {".csv", ".pdf"} | EXCEL_EXTENSIONS
 
 
 def detect_and_parse(filepath: Path) -> list[Transaction]:
-    """Auto-detect bank format and parse a CSV or Excel file."""
+    """Auto-detect bank format and parse a CSV, Excel, or PDF file."""
     filepath = Path(filepath)
     if not filepath.exists():
         raise FileNotFoundError(f"File not found: {filepath}")
@@ -32,6 +33,14 @@ def detect_and_parse(filepath: Path) -> list[Transaction]:
             f"Unsupported file type: {filepath.suffix}. "
             f"Supported: {', '.join(sorted(SUPPORTED_EXTENSIONS))}"
         )
+
+    if filepath.suffix.lower() == ".pdf":
+        if not pdf_available():
+            raise ImportError("pdfplumber is required for PDF parsing. Install: pip install pdfplumber")
+        transactions = parse_credit_card_pdf(filepath)
+        if transactions:
+            return transactions
+        raise ValueError(f"No transactions found in PDF: {filepath}")
 
     content = BankParser.read_file(filepath)
     lines = content.splitlines()
