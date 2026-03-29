@@ -97,10 +97,9 @@ def inject_fixed_expenses(
 def parse_uploaded_files(uploaded_files) -> dict[str, list[Transaction]]:
     grouped: dict[str, list[Transaction]] = {}
     for uf in uploaded_files:
-        suffix = Path(uf.name).suffix
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(uf.getbuffer())
-            tmp_path = Path(tmp.name)
+        tmpdir = tempfile.mkdtemp()
+        tmp_path = Path(tmpdir) / uf.name
+        tmp_path.write_bytes(uf.getbuffer())
         try:
             txs = detect_and_parse(tmp_path)
             label = txs[0].billing_label if txs and txs[0].billing_label else Path(uf.name).stem
@@ -109,6 +108,7 @@ def parse_uploaded_files(uploaded_files) -> dict[str, list[Transaction]]:
             st.error(f"שגיאה בקובץ {uf.name}: {e}")
         finally:
             tmp_path.unlink(missing_ok=True)
+            Path(tmpdir).rmdir()
     return grouped
 
 
